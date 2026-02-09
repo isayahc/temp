@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './App.css';
+import SupplyMap from './SupplyMap'; // <--- IMPORT THE MAP COMPONENT
 
 // --- TYPES ---
 interface Coordinates { lat: number; lng: number; }
@@ -94,7 +95,7 @@ function App() {
       {report && (
         <div style={{ marginTop: '40px', animation: 'fadeIn 0.5s ease-in' }}>
           
-          {/* RISK SCORE CARD */}
+          {/* 1. RISK SCORE CARD */}
           <div style={{ 
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             background: '#2a2a2a', padding: '30px', borderRadius: '16px', 
@@ -115,7 +116,16 @@ function App() {
             </div>
           </div>
 
-          {/* SUPPLY CHAIN NODES */}
+          {/* 2. THE WAR ROOM MAP (NEW INTEGRATION) */}
+          <div style={{ marginBottom: '40px' }}>
+            <h3 style={{ color: '#fff', borderBottom: '1px solid #333', paddingBottom: '10px', marginBottom: '0' }}>
+              Global Operations View
+            </h3>
+            {/* Pass the supply chain nodes to the map */}
+            <SupplyMap nodes={report.supply_chain} />
+          </div>
+
+          {/* 3. DETAILED LIST */}
           <h3 style={{ color: '#fff', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
             Critical Supply Nodes ({report.supply_chain.length})
           </h3>
@@ -124,7 +134,8 @@ function App() {
             {report.supply_chain.map((node, i) => (
               <div key={i} style={{ 
                 background: '#1a1a1a', padding: '20px', borderRadius: '12px', 
-                border: '1px solid #333', position: 'relative', overflow: 'hidden'
+                border: '1px solid #333', position: 'relative', overflow: 'hidden',
+                opacity: node.found ? 1 : 0.7 
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#fff' }}>{node.company_name}</span>
@@ -154,7 +165,7 @@ function App() {
                       textDecoration: 'none', fontSize: '0.9rem', fontWeight: 'bold' 
                     }}
                   >
-                    View Satellite Data &rarr;
+                    View Satellite Data →
                   </a>
                 )}
               </div>
