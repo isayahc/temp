@@ -1,305 +1,168 @@
 import { useState } from 'react';
 import './App.css';
 
-// ==========================================
-// Types
-// ==========================================
-interface Ingredient {
-  name: string;
-  amount: string;
-}
+// --- TYPES ---
+interface Coordinates { lat: number; lng: number; }
 
-interface Recipe {
-  title: string;
-  difficulty: string;
-  prep_time_minutes: number;
-  calories: number;
-  ingredients: Ingredient[];
-  instructions: string[];
-}
-
-interface Coordinates {
-  lat: number;
-  lng: number;
-}
-
-interface CompanyLocation {
-  name: string;
-  address: string;
-  coordinates: Coordinates;
-}
-
-// New Types for Supply Chain
 interface SupplyChainNode {
   company_name: string;
   role: string;
-  location_query: string;
   found: boolean;
   address?: string;
   coordinates?: Coordinates;
 }
 
-interface SupplyChainData {
+interface CrisisReport {
   product: string;
+  risk_score: number;
+  risk_summary: string;
   supply_chain: SupplyChainNode[];
 }
 
 function App() {
-  // ==========================================
-  // State: Recipe Generator
-  // ==========================================
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [recipeLoading, setRecipeLoading] = useState(false);
-  const [recipeError, setRecipeError] = useState('');
+  const [query, setQuery] = useState('');
+  const [report, setReport] = useState<CrisisReport | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // ==========================================
-  // State: Company Locator
-  // ==========================================
-  const [companyQuery, setCompanyQuery] = useState('');
-  const [location, setLocation] = useState<CompanyLocation | null>(null);
-  const [locLoading, setLocLoading] = useState(false);
-  const [locError, setLocError] = useState('');
+  const analyzeRisk = async () => {
+    if (!query) return;
+    setLoading(true);
+    setReport(null);
+    setError('');
 
-  // ==========================================
-  // State: Supply Chain X-Ray
-  // ==========================================
-  const [productQuery, setProductQuery] = useState('');
-  const [chainData, setChainData] = useState<SupplyChainData | null>(null);
-  const [chainLoading, setChainLoading] = useState(false);
-  const [chainError, setChainError] = useState('');
-
-  // ==========================================
-  // Function 1: Get Recipe (Gemini)
-  // ==========================================
-  const getRecipe = async () => {
-    setRecipeLoading(true);
-    setRecipeError('');
-    
     try {
-      const response = await fetch('/api/generate-recipe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ingredients: ['chicken', 'rice', 'soy sauce', 'broccoli'],
-          dietary_restrictions: 'gluten-free'
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch recipe');
-      const data = await response.json();
-      setRecipe(data);
+      const res = await fetch(`/api/supply-chain?product_name=${encodeURIComponent(query)}`, { method: 'POST' });
+      if (!res.ok) throw new Error('Analysis failed');
+      const data = await res.json();
+      setReport(data);
     } catch (err) {
       console.error(err);
-      setRecipeError('Something went wrong generating the recipe.');
+      setError('System could not analyze supply chain.');
     } finally {
-      setRecipeLoading(false);
+      setLoading(false);
     }
   };
 
-  // ==========================================
-  // Function 2: Get Coordinates (Google Maps)
-  // ==========================================
-  const getCoords = async () => {
-    if (!companyQuery) return;
-    
-    setLocLoading(true);
-    setLocError('');
-    setLocation(null);
-
-    try {
-      const response = await fetch('/api/get-coords', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          company_name: companyQuery,
-          city: ''
-        })
-      });
-
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
-      setLocation(data);
-    } catch (err) {
-      console.error(err);
-      setLocError('Could not find that company.');
-    } finally {
-      setLocLoading(false);
-    }
-  };
-
-  // ==========================================
-  // Function 3: Supply Chain Analysis (Gemini + Maps)
-  // ==========================================
-  const getSupplyChain = async () => {
-    if (!productQuery) return;
-
-    setChainLoading(true);
-    setChainError('');
-    setChainData(null);
-
-    try {
-      // Note: Make sure your Python backend expects 'product_name' query param
-      // OR update this to send a JSON body if you changed your backend.
-      // This assumes: @app.post("/api/supply-chain") def get_supply_chain(product_name: str):
-      const response = await fetch(`/api/supply-chain?product_name=${encodeURIComponent(productQuery)}`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) throw new Error('Failed to analyze supply chain');
-
-      const data = await response.json();
-      setChainData(data);
-    } catch (err) {
-      console.error(err);
-      setChainError('Failed to analyze supply chain.');
-    } finally {
-      setChainLoading(false);
-    }
+  // Helper to determine color based on risk score
+  const getRiskColor = (score: number) => {
+    if (score < 40) return '#4ade80'; // Green
+    if (score < 75) return '#fbbf24'; // Orange
+    return '#ef4444'; // Red
   };
 
   return (
-    <div className="app-container" style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
-      <h1>🚀 Isayah's Hackathon Dashboard</h1>
+    <div className="app-container" style={{ maxWidth: '900px', margin: '0 auto', padding: '40px 20px', fontFamily: 'Inter, sans-serif' }}>
       
-      {/* =======================================================
-          TOOL 1: CHEF-IT-UP
-      ======================================================== */}
-      <div className="card" style={{ border: '1px solid #444', padding: '20px', marginBottom: '40px', borderRadius: '12px' }}>
-        <h2>👨‍🍳 Chef-It-Up (Gemini AI)</h2>
-        <p style={{ color: '#aaa', fontSize: '0.9rem' }}>Generates a recipe based on hardcoded ingredients.</p>
-        
-        <button onClick={getRecipe} disabled={recipeLoading}>
-          {recipeLoading ? 'Cooking...' : '✨ Generate Recipe'}
-        </button>
-
-        {recipeError && <p style={{ color: 'red' }}>{recipeError}</p>}
-
-        {recipe && (
-          <div className="recipe-card" style={{ textAlign: 'left', background: '#222', padding: '20px', borderRadius: '8px', marginTop: '20px' }}>
-            <h3 style={{ marginTop: 0 }}>{recipe.title}</h3>
-            <p><strong>Calories:</strong> {recipe.calories} | <strong>Time:</strong> {recipe.prep_time_minutes} min</p>
-            <h4>Ingredients</h4>
-            <ul>
-              {recipe.ingredients.map((ing, i) => <li key={i}>{ing.amount} {ing.name}</li>)}
-            </ul>
-            <h4>Instructions</h4>
-            <ol>
-              {recipe.instructions.map((step, i) => <li key={i}>{step}</li>)}
-            </ol>
-          </div>
-        )}
+      {/* HEADER */}
+      <div style={{ textAlign: 'center', marginBottom: '50px' }}>
+        <h1 style={{ fontSize: '3rem', margin: '0 0 10px 0' }}>🚨 Crisis Manager</h1>
+        <p style={{ color: '#888', fontSize: '1.2rem' }}>
+          AI-Powered Supply Chain Resilience Analysis
+        </p>
       </div>
 
-      {/* =======================================================
-          TOOL 2: COMPANY LOCATOR
-      ======================================================== */}
-      <div className="card" style={{ border: '1px solid #444', padding: '20px', marginBottom: '40px', borderRadius: '12px' }}>
-        <h2>📍 Company Locator (Google Maps)</h2>
-        <p style={{ color: '#aaa', fontSize: '0.9rem' }}>Finds the exact coordinates of any business.</p>
-
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '10px' }}>
+      {/* SEARCH BAR */}
+      <div className="card" style={{ background: '#1e1e1e', padding: '30px', borderRadius: '16px', border: '1px solid #333' }}>
+        <div style={{ display: 'flex', gap: '15px' }}>
           <input 
             type="text" 
-            placeholder="e.g. Tesla Gigafactory Texas"
-            value={companyQuery}
-            onChange={(e) => setCompanyQuery(e.target.value)}
-            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #666', width: '60%' }}
+            placeholder="Enter Product (e.g. Nvidia H100, Pfizer Vaccine, F-35 Jet)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ 
+              flex: 1, padding: '15px', borderRadius: '8px', border: '1px solid #444', 
+              background: '#111', color: '#fff', fontSize: '1.1rem' 
+            }}
           />
-          <button onClick={getCoords} disabled={locLoading || !companyQuery}>
-            {locLoading ? 'Searching...' : 'Find'}
+          <button 
+            onClick={analyzeRisk} 
+            disabled={loading || !query}
+            style={{ 
+              padding: '0 30px', borderRadius: '8px', border: 'none', 
+              background: loading ? '#555' : '#3b82f6', color: '#fff', 
+              fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' 
+            }}
+          >
+            {loading ? 'ANALYZING...' : 'RUN ANALYSIS'}
           </button>
         </div>
+        {error && <p style={{ color: '#ef4444', marginTop: '15px' }}>⚠️ {error}</p>}
+      </div>
 
-        {locError && <p style={{ color: 'red' }}>{locError}</p>}
-
-        {location && (
-          <div style={{ textAlign: 'left', background: '#1a2e1a', padding: '20px', borderRadius: '8px', marginTop: '20px', border: '1px solid #2e5c2e' }}>
-            <h3 style={{ marginTop: 0, color: '#4ade80' }}>{location.name}</h3>
-            <p style={{ fontSize: '1.1rem' }}>{location.address}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-              <div style={{ background: '#000', padding: '10px', borderRadius: '4px' }}>
-                <strong>Latitude:</strong> <br/> {location.coordinates.lat}
+      {/* REPORT DASHBOARD */}
+      {report && (
+        <div style={{ marginTop: '40px', animation: 'fadeIn 0.5s ease-in' }}>
+          
+          {/* RISK SCORE CARD */}
+          <div style={{ 
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: '#2a2a2a', padding: '30px', borderRadius: '16px', 
+            borderLeft: `10px solid ${getRiskColor(report.risk_score)}`,
+            marginBottom: '30px'
+          }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#fff' }}>Risk Assessment</h2>
+              <p style={{ margin: '10px 0 0 0', color: '#ccc', fontSize: '1.1rem' }}>{report.risk_summary}</p>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '3rem', fontWeight: 'bold', color: getRiskColor(report.risk_score) }}>
+                {report.risk_score}/100
               </div>
-              <div style={{ background: '#000', padding: '10px', borderRadius: '4px' }}>
-                <strong>Longitude:</strong> <br/> {location.coordinates.lng}
+              <div style={{ fontSize: '0.9rem', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                Vulnerability Score
               </div>
             </div>
-            
-            <a 
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.name + ' ' + location.address)}`} 
-              target="_blank" 
-              rel="noreferrer"
-              style={{ display: 'inline-block', marginTop: '15px', color: '#4ade80' }}
-            >
-              Open in Google Maps →
-            </a>
           </div>
-        )}
-      </div>
 
-      {/* =======================================================
-          TOOL 3: SUPPLY CHAIN X-RAY
-      ======================================================== */}
-      <div className="card" style={{ border: '1px solid #444', padding: '20px', borderRadius: '12px' }}>
-        <h2>📦 Supply Chain X-Ray</h2>
-        <p style={{ color: '#aaa', fontSize: '0.9rem' }}>Gemini identifies the companies. Google Maps finds them.</p>
-
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px' }}>
-          <input 
-            type="text" 
-            placeholder="e.g. iPhone 15 Pro"
-            value={productQuery}
-            onChange={(e) => setProductQuery(e.target.value)}
-            style={{ padding: '10px', borderRadius: '6px', border: '1px solid #666', width: '60%' }}
-          />
-          <button onClick={getSupplyChain} disabled={chainLoading || !productQuery}>
-            {chainLoading ? 'Analyzing...' : 'X-Ray'}
-          </button>
-        </div>
-
-        {chainError && <p style={{ color: 'red' }}>{chainError}</p>}
-
-        {chainData && (
-          <div style={{ display: 'grid', gap: '10px', textAlign: 'left' }}>
-            <h3 style={{ textAlign: 'center', marginTop: 0 }}>Supply Chain for: {chainData.product}</h3>
-            {chainData.supply_chain.map((node, i) => (
+          {/* SUPPLY CHAIN NODES */}
+          <h3 style={{ color: '#fff', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
+            Critical Supply Nodes ({report.supply_chain.length})
+          </h3>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px', marginTop: '20px' }}>
+            {report.supply_chain.map((node, i) => (
               <div key={i} style={{ 
-                background: '#222', 
-                padding: '15px', 
-                borderRadius: '8px', 
-                borderLeft: node.found ? '4px solid #4ade80' : '4px solid #ef4444' 
+                background: '#1a1a1a', padding: '20px', borderRadius: '12px', 
+                border: '1px solid #333', position: 'relative', overflow: 'hidden'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '1.1rem' }}>{node.company_name}</strong>
-                  <span style={{ fontSize: '0.8rem', background: '#444', padding: '2px 8px', borderRadius: '4px' }}>
-                    {node.role}
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#fff' }}>{node.company_name}</span>
+                  {node.found && (
+                    <span style={{ fontSize: '1.2rem' }} title="Location Verified">📍</span>
+                  )}
                 </div>
                 
-                <p style={{ margin: '8px 0', fontSize: '0.9rem', color: '#ccc' }}>
-                  {node.found ? `📍 ${node.address}` : '❌ Location not found'}
+                <div style={{ 
+                  display: 'inline-block', background: '#333', color: '#ddd', 
+                  padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', marginBottom: '15px' 
+                }}>
+                  {node.role}
+                </div>
+
+                <p style={{ fontSize: '0.9rem', color: '#888', margin: 0, lineHeight: '1.4' }}>
+                  {node.found ? node.address : 'Location Data Unavailable'}
                 </p>
 
                 {node.found && node.coordinates && (
                   <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${node.coordinates.lat},${node.coordinates.lng}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(node.address || '')}`}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ fontSize: '0.85rem', color: '#4ade80', textDecoration: 'none' }}
+                    style={{ 
+                      display: 'block', marginTop: '15px', color: '#3b82f6', 
+                      textDecoration: 'none', fontSize: '0.9rem', fontWeight: 'bold' 
+                    }}
                   >
-                    View on Map ↗
+                    View Satellite Data &rarr;
                   </a>
                 )}
               </div>
             ))}
           </div>
-        )}
-      </div>
 
+        </div>
+      )}
     </div>
   );
 }
