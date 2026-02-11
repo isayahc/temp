@@ -57,7 +57,7 @@ function App() {
       
       {/* HEADER */}
       <div style={{ textAlign: 'center', marginBottom: '50px' }}>
-        <h1 style={{ fontSize: '3rem', margin: '0 0 10px 0' }}>🚨 Crisis Manager</h1>
+        <h1 style={{ fontSize: '3rem', margin: '0 0 10px 0' }}>Global Supply Chain Analyzer</h1>
         <p style={{ color: '#888', fontSize: '1.2rem' }}>
           AI-Powered Supply Chain Resilience Analysis
         </p>
